@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-labelledby="titleDesc">
+  <title id="titleDesc">Blue star icon</title>
+  <desc>Original blue five-pointed star badge used as site icon.</desc>
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" x2="100%" y1="0%" y2="100%">
+      <stop offset="0%" stop-color="#0f62fe" />
+      <stop offset="100%" stop-color="#0050b3" />
+    </linearGradient>
+    <linearGradient id="starGrad" x1="0%" x2="100%" y1="0%" y2="100%">
+      <stop offset="0%" stop-color="#66b2ff" />
+      <stop offset="60%" stop-color="#2b7be9" />
+      <stop offset="100%" stop-color="#0b3d91" />
+    </linearGradient>
+    <radialGradient id="starShine" cx="30%" cy="25%" r="70%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.6" />
+      <stop offset="60%" stop-color="#ffffff" stop-opacity="0.08" />
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.02" />
+    </radialGradient>
+    <filter id="drop" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="4" result="blur" />
+      <feOffset in="blur" dx="0" dy="3" result="offset" />
+      <feMerge>
+        <feMergeNode in="offset" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- background badge -->
+  <rect width="256" height="256" rx="36" fill="url(#bgGrad)" />
+
+  <!-- shadowed star group centered -->
+  <g transform="translate(128,128)" filter="url(#drop)">
+    <!-- main star shape (5-point) -->
+    <polygon points="0,-76 22,-24 86,-24 34,8 56,68 0,36 -56,68 -34,8 -86,-24 -22,-24"
+             fill="url(#starGrad)" stroke="#072b63" stroke-width="4" stroke-linejoin="round" />
+    <!-- glossy highlight -->
+    <polygon points="-12,-56 8,-30 36,-18 6,-8 10,10 -12,-2 -34,10 -28,-8 -44,-22 -18,-30"
+             fill="url(#starShine)" opacity="0.9" />
+  </g>
+</svg>

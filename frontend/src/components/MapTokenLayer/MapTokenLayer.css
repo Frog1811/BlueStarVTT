@@ -1,0 +1,379 @@
+.map-token-layer {
+  /* pointer-events controlled via inline styles */
+}
+
+.map-token {
+  transition: none;
+  box-sizing: border-box;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden;
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.map-token img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: block;
+  min-width: 100%;
+  min-height: 100%;
+}
+
+.map-token.dragging {
+  opacity: 0.7;
+  z-index: 1000;
+}
+
+.map-token.dm-draggable {
+  cursor: move;
+}
+
+.map-token.dm-draggable:hover {
+  outline: 2px solid #3b82f6;
+  outline-offset: -2px;
+}
+
+.token-image {
+  border-radius: 4px;
+  display: block;
+}
+
+.map-token-context-menu {
+  background: #1f2937;
+  border: 1px solid #374151;
+  border-radius: 0.5rem;
+  padding: 0.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  min-width: 200px;
+  z-index: 10000;
+}
+
+.context-menu-item {
+  padding: 0.5rem 0.75rem;
+  color: #e5e7eb;
+  cursor: pointer;
+  border-radius: 0.25rem;
+  transition: background 0.2s;
+}
+
+.context-menu-item:hover {
+  background: #374151;
+}
+
+.context-menu-divider {
+  height: 1px;
+  background: #374151;
+  margin: 0.5rem 0;
+}
+
+.context-menu-resize {
+  padding: 0.5rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.context-menu-resize label {
+  color: #e5e7eb;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.context-menu-resize input {
+  background: #374151;
+  border: 1px solid #4b5563;
+  border-radius: 0.25rem;
+  color: #e5e7eb;
+  padding: 0.375rem 0.5rem;
+  font-size: 0.875rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.context-menu-resize input:focus {
+  outline: none;
+  border-color: #3b82f6;
+}
+
+.context-menu-resize button {
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 0.25rem;
+  padding: 0.375rem 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.context-menu-resize button:hover {
+  background: #2563eb;
+}
+
+.context-menu-visibility {
+  padding: 0.5rem 0.75rem;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.context-menu-visibility label {
+  color: #e5e7eb;
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.toggle-switch {
+  position: relative;
+  display: inline-flex;
+  width: 48px;
+  height: 26px;
+  background: #4b5563;
+  border-radius: 13px;
+  cursor: pointer;
+  transition: background 0.3s;
+  border: none;
+  padding: 0;
+  align-items: center;
+}
+
+.toggle-switch.active {
+  background: #10b981;
+}
+
+.toggle-switch::after {
+  content: '';
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  background: white;
+  border-radius: 50%;
+  top: 2px;
+  left: 2px;
+  transition: left 0.3s;
+}
+
+.toggle-switch.active::after {
+  left: 24px;
+}
+
+/* Token name plate styling */
+.token-name-plate {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(50, 50, 50, 0.8);
+  color: #e5e7eb;
+  padding: 2px 4px;
+  font-size: 10px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 600;
+  z-index: 10;
+}
+
+/* Border color styles */
+.map-token[data-border-color="red"] {
+  outline: 3px solid #ef4444 !important;
+}
+
+.map-token[data-border-color="blue"] {
+  outline: 3px solid #3b82f6 !important;
+}
+
+.map-token[data-border-color="green"] {
+  outline: 3px solid #10b981 !important;
+}
+
+.map-token[data-border-color="yellow"] {
+  outline: 3px solid #f59e0b !important;
+}
+
+.map-token[data-border-color="purple"] {
+  outline: 3px solid #a855f7 !important;
+}
+
+.map-token[data-border-color="orange"] {
+  outline: 3px solid #f97316 !important;
+}
+
+.map-token[data-border-color="cyan"] {
+  outline: 3px solid #06b6d4 !important;
+}
+
+/* Context menu sections */
+.context-menu-name {
+  padding: 0.5rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.context-menu-name label {
+  color: #e5e7eb;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.context-menu-name input {
+  background: #374151;
+  border: 1px solid #4b5563;
+  border-radius: 0.25rem;
+  color: #e5e7eb;
+  padding: 0.375rem 0.5rem;
+  font-size: 0.875rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.context-menu-name input:focus {
+  outline: none;
+  border-color: #3b82f6;
+}
+
+.context-menu-name button {
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 0.25rem;
+  padding: 0.375rem 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.context-menu-name button:hover {
+  background: #2563eb;
+}
+
+.context-menu-colors {
+  padding: 0.5rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.context-menu-colors label {
+  color: #e5e7eb;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.color-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(40px, 40px));
+  gap: 0.25rem;
+}
+
+.color-swatch {
+  width: 40px;
+  height: 40px;
+  border: 1px solid transparent;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.color-swatch:hover {
+  transform: scale(1.05);
+  border-color: #3b82f6;
+}
+
+.color-swatch.selected::after {
+  content: '✓';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white;
+  font-weight: bold;
+  text-shadow: 0 0 2px rgba(0, 0, 0, 0.5);
+}
+
+.color-swatch-none {
+  background: linear-gradient(45deg, #1f2937 25%, transparent 25%, transparent 75%, #1f2937 75%);
+  background-size: 10px 10px;
+}
+
+.color-swatch-red {
+  background: #ef4444;
+}
+
+.color-swatch-blue {
+  background: #3b82f6;
+}
+
+.color-swatch-green {
+  background: #10b981;
+}
+
+.color-swatch-yellow {
+  background: #f59e0b;
+}
+
+.color-swatch-purple {
+  background: #a855f7;
+}
+
+.color-swatch-orange {
+  background: #f97316;
+}
+
+.color-swatch-cyan {
+  background: #06b6d4;
+}
+
+/* Condition badges on tokens */
+.token-conditions {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  z-index: 20;
+  pointer-events: auto; /* Enable pointer events so hover works */
+}
+
+.condition-badge {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  background: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  border: 1px solid #e5e7eb;
+  pointer-events: auto; /* Enable hover */
+  cursor: help; /* Show help cursor on hover */
+}
+
+.condition-badge svg {
+  width: 16px;
+  height: 16px;
+  color: #1f2937;
+}
+
+/* Browser default tooltip (title attribute) is used instead of custom CSS tooltip */
+

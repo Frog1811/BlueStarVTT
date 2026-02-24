@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Condition Icons Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 2rem;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        .condition-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+        .condition-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 1rem;
+            background: #2a2a2a;
+            border-radius: 8px;
+            border: 2px solid #3a3a3a;
+        }
+        .condition-icon {
+            width: 48px;
+            height: 48px;
+            background: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 8px;
+        }
+        .condition-icon svg {
+            width: 32px;
+            height: 32px;
+            color: #1f2937;
+        }
+        .condition-name {
+            font-size: 0.9rem;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <h1>D&D 5e Condition Icons</h1>
+    <p>These are the custom SVG icons created for the D&D conditions system</p>
+
+    <div class="condition-grid" id="conditionGrid"></div>
+
+    <script type="module">
+        // Import the condition icons (this would need to be built/bundled in production)
+        const conditions = [
+            'Blinded', 'Charmed', 'Deafened', 'Frightened', 'Grappled',
+            'Incapacitated', 'Invisible', 'Paralyzed', 'Petrified', 'Poisoned',
+            'Prone', 'Restrained', 'Stunned', 'Unconscious'
+        ];
+
+        const grid = document.getElementById('conditionGrid');
+
+        conditions.forEach(condition => {
+            const item = document.createElement('div');
+            item.className = 'condition-item';
+
+            const iconDiv = document.createElement('div');
+            iconDiv.className = 'condition-icon';
+            iconDiv.innerHTML = `<div style="width:32px;height:32px;background:#666;border-radius:4px;"></div>`;
+
+            const name = document.createElement('div');
+            name.className = 'condition-name';
+            name.textContent = condition;
+
+            item.appendChild(iconDiv);
+            item.appendChild(name);
+            grid.appendChild(item);
+        });
+    </script>
+</body>
+</html>
+

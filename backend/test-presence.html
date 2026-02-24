@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Presence System Test</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            padding: 20px;
+            background: #1e2231;
+            color: #fff;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .panel {
+            background: #2c3e50;
+            padding: 20px;
+            margin: 10px 0;
+            border-radius: 8px;
+        }
+        h2 {
+            color: #facc15;
+            margin-top: 0;
+        }
+        input, button {
+            padding: 8px 12px;
+            margin: 5px;
+            border-radius: 4px;
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+        button:disabled {
+            background: #6b7280;
+            cursor: not-allowed;
+        }
+        .log {
+            background: #0d1117;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-size: 12px;
+        }
+        .log-entry {
+            margin: 2px 0;
+            padding: 2px 0;
+        }
+        .log-ping { color: #93c5fd; }
+        .log-sse { color: #10b981; }
+        .log-error { color: #ef4444; }
+        .log-info { color: #facc15; }
+        .users {
+            margin: 10px 0;
+        }
+        .user {
+            padding: 8px;
+            margin: 5px 0;
+            background: #1e2835;
+            border-left: 3px solid #3b82f6;
+            border-radius: 4px;
+        }
+        .user.dm {
+            border-left-color: #facc15;
+            color: #facc15;
+        }
+        .status {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .status.connected {
+            background: #10b981;
+        }
+        .status.disconnected {
+            background: #ef4444;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Presence System Test</h1>
+
+        <div class="panel">
+            <h2>Configuration</h2>
+            <div>
+                <label>Session ID: <input type="text" id="sessionId" placeholder="Enter campaign ID" style="width: 300px"></label>
+            </div>
+            <div>
+                <label>User ID: <input type="text" id="userId" placeholder="Optional - leave empty for auto"></label>
+            </div>
+            <div>
+                <label>Name: <input type="text" id="userName" placeholder="Your name"></label>
+            </div>
+            <div>
+                <label>Role:
+                    <select id="userRole">
+                        <option value="dm">DM</option>
+                        <option value="player">Player</option>
+                    </select>
+                </label>
+            </div>
+            <button id="connectBtn">Connect</button>
+            <button id="disconnectBtn" disabled>Disconnect</button>
+            <button id="clearLogBtn">Clear Log</button>
+        </div>
+
+        <div class="panel">
+            <h2>Status</h2>
+            <p>
+                Connection:
+                <span class="status disconnected" id="statusIndicator"></span>
+                <span id="statusText">Disconnected</span>
+            </p>
+            <p>Ping Count: <span id="pingCount">0</span></p>
+            <p>Message Count: <span id="msgCount">0</span></p>
+        </div>
+
+        <div class="panel">
+            <h2>Online Users (<span id="userCount">0</span>)</h2>
+            <div id="usersList" class="users">
+                <p style="color: #9ca3af;">No users online</p>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>Event Log</h2>
+            <div id="logContainer" class="log"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:3001';
+        let eventSource = null;
+        let pingTimer = null;
+        let pingCount = 0;
+        let msgCount = 0;
+
+        const log = (message, type = 'info') => {
+            const logContainer = document.getElementById('logContainer');
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            const timestamp = new Date().toLocaleTimeString();
+            entry.textContent = `[${timestamp}] ${message}`;
+            logContainer.appendChild(entry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        };
+
+        const updateStatus = (connected) => {
+            const indicator = document.getElementById('statusIndicator');
+            const text = document.getElementById('statusText');
+            if (connected) {
+                indicator.className = 'status connected';
+                text.textContent = 'Connected';
+            } else {
+                indicator.className = 'status disconnected';
+                text.textContent = 'Disconnected';
+            }
+        };
+
+        const updateUsers = (users) => {
+            const container = document.getElementById('usersList');
+            const countSpan = document.getElementById('userCount');
+
+            countSpan.textContent = users.length;
+
+            if (users.length === 0) {
+                container.innerHTML = '<p style="color: #9ca3af;">No users online</p>';
+                return;
+            }
+
+            const sorted = [...users].sort((a, b) => {
+                if (a.role === b.role) {
+                    return a.name.localeCompare(b.name);
+                }
+                return a.role === 'dm' ? -1 : 1;
+            });
+
+            container.innerHTML = sorted.map(user => `
+                <div class="user ${user.role === 'dm' ? 'dm' : ''}">
+                    <strong>${user.name}</strong> ${user.role === 'dm' ? '(DM)' : ''}
+                    <br>
+                    <small>ID: ${user.id} | Last seen: ${new Date(user.lastSeen).toLocaleTimeString()}</small>
+                </div>
+            `).join('');
+        };
+
+        const sendPing = async () => {
+            const sessionId = document.getElementById('sessionId').value.trim();
+            const userId = document.getElementById('userId').value.trim();
+            const name = document.getElementById('userName').value.trim();
+            const role = document.getElementById('userRole').value;
+
+            if (!sessionId || !name) {
+                log('Cannot ping: missing sessionId or name', 'error');
+                return;
+            }
+
+            try {
+                const payload = {
+                    sessionId,
+                    userId: userId || undefined,
+                    name,
+                    role
+                };
+
+                log(`Sending ping: ${JSON.stringify(payload)}`, 'ping');
+
+                const response = await fetch(`${API_BASE}/api/presence/ping`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (response.ok) {
+                    pingCount++;
+                    document.getElementById('pingCount').textContent = pingCount;
+                    log('Ping sent successfully ✓', 'ping');
+                } else {
+                    const error = await response.text();
+                    log(`Ping failed: ${error}`, 'error');
+                }
+            } catch (error) {
+                log(`Ping error: ${error.message}`, 'error');
+            }
+        };
+
+        const connect = () => {
+            const sessionId = document.getElementById('sessionId').value.trim();
+            const name = document.getElementById('userName').value.trim();
+
+            if (!sessionId || !name) {
+                alert('Please enter Session ID and Name');
+                return;
+            }
+
+            disconnect();
+
+            log('Connecting to SSE stream...', 'info');
+
+            const streamUrl = `${API_BASE}/api/presence/stream?sessionId=${encodeURIComponent(sessionId)}`;
+            log(`Stream URL: ${streamUrl}`, 'info');
+
+            eventSource = new EventSource(streamUrl);
+
+            eventSource.onopen = () => {
+                log('SSE connection opened ✓', 'sse');
+                updateStatus(true);
+
+                // Send initial ping
+                sendPing();
+
+                // Start ping interval
+                pingTimer = setInterval(sendPing, 15000);
+            };
+
+            eventSource.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    msgCount++;
+                    document.getElementById('msgCount').textContent = msgCount;
+                    log(`Received: ${data.users.length} users`, 'sse');
+                    updateUsers(data.users);
+                } catch (error) {
+                    log(`Parse error: ${error.message}`, 'error');
+                }
+            };
+
+            eventSource.onerror = (error) => {
+                log('SSE connection error ✗', 'error');
+                updateStatus(false);
+            };
+
+            document.getElementById('connectBtn').disabled = true;
+            document.getElementById('disconnectBtn').disabled = false;
+        };
+
+        const disconnect = () => {
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+                log('SSE connection closed', 'info');
+            }
+
+            if (pingTimer) {
+                clearInterval(pingTimer);
+                pingTimer = null;
+            }
+
+            updateStatus(false);
+            document.getElementById('connectBtn').disabled = false;
+            document.getElementById('disconnectBtn').disabled = true;
+        };
+
+        document.getElementById('connectBtn').addEventListener('click', connect);
+        document.getElementById('disconnectBtn').addEventListener('click', disconnect);
+        document.getElementById('clearLogBtn').addEventListener('click', () => {
+            document.getElementById('logContainer').innerHTML = '';
+            pingCount = 0;
+            msgCount = 0;
+            document.getElementById('pingCount').textContent = '0';
+            document.getElementById('msgCount').textContent = '0';
+        });
+
+        // Fill in test data
+        document.getElementById('userName').value = 'TestUser' + Math.floor(Math.random() * 1000);
+    </script>
+</body>
+</html>
+

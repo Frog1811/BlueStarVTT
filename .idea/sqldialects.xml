@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="SqlDialectMappings">
+    <file url="file://$PROJECT_DIR$/backend/Migration/002_create_campaign_images.sql" dialect="MySQL" />
+    <file url="file://$PROJECT_DIR$/backend/Migration/003_create_users.sql" dialect="MySQL" />
+    <file url="file://$PROJECT_DIR$/backend/Migration/004_create_campaigns.sql" dialect="MySQL" />
+    <file url="file://$PROJECT_DIR$/backend/Migration/014_create_encounter_npcs.sql" dialect="MySQL" />
+    <file url="file://$PROJECT_DIR$/backend/Migration/015_create_map_notes.sql" dialect="MySQL" />
+    <file url="file://$PROJECT_DIR$/backend/Migration/021_create_token_groups.sql" dialect="MySQL" />
+    <file url="file://$PROJECT_DIR$/backend/Migration/023_create_bug_reports.sql" dialect="MySQL" />
+  </component>
+</project>

@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug User Info</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #1e2231;
+            color: #fff;
+        }
+        .section {
+            background: #2c3e50;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .label {
+            color: #facc15;
+            font-weight: bold;
+        }
+        .value {
+            color: #93c5fd;
+            margin-left: 10px;
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+        pre {
+            background: #0d1117;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 BlueMusic User Debug Panel</h1>
+
+    <div class="section">
+        <h2>LocalStorage User Data</h2>
+        <div id="userData"></div>
+        <button onclick="refreshData()">Refresh</button>
+        <button onclick="clearUser()">Clear User</button>
+    </div>
+
+    <div class="section">
+        <h2>Test API Connection</h2>
+        <input type="text" id="campaignId" placeholder="Enter Campaign ID" style="width: 300px; padding: 8px;">
+        <button onclick="testCampaignFetch()">Test Fetch Campaign</button>
+        <div id="apiResult"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:3001';
+
+        function refreshData() {
+            const userDataDiv = document.getElementById('userData');
+            const stored = localStorage.getItem('bm_user');
+
+            if (!stored) {
+                userDataDiv.innerHTML = '<p style="color: #ef4444;">❌ No user found in localStorage</p>';
+                return;
+            }
+
+            try {
+                const user = JSON.parse(stored);
+                userDataDiv.innerHTML = `
+                    <p><span class="label">User ID:</span><span class="value">${user.id || '❌ MISSING'}</span></p>
+                    <p><span class="label">Username:</span><span class="value">${user.username || '❌ MISSING'}</span></p>
+                    <p><span class="label">Email:</span><span class="value">${user.email || '❌ MISSING'}</span></p>
+                    <h3>Raw JSON:</h3>
+                    <pre>${JSON.stringify(user, null, 2)}</pre>
+                `;
+            } catch (error) {
+                userDataDiv.innerHTML = `<p style="color: #ef4444;">❌ Error parsing user: ${error.message}</p>`;
+            }
+        }
+
+        function clearUser() {
+            localStorage.removeItem('bm_user');
+            alert('User cleared from localStorage');
+            refreshData();
+        }
+
+        async function testCampaignFetch() {
+            const campaignId = document.getElementById('campaignId').value.trim();
+            const resultDiv = document.getElementById('apiResult');
+
+            if (!campaignId) {
+                resultDiv.innerHTML = '<p style="color: #ef4444;">Please enter a campaign ID</p>';
+                return;
+            }
+
+            resultDiv.innerHTML = '<p style="color: #facc15;">⏳ Fetching...</p>';
+
+            try {
+                const response = await fetch(`${API_BASE}/api/campaigns/${encodeURIComponent(campaignId)}`);
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    resultDiv.innerHTML = `<p style="color: #ef4444;">❌ Error ${response.status}: ${error.message}</p>`;
+                    return;
+                }
+
+                const campaign = await response.json();
+                const user = JSON.parse(localStorage.getItem('bm_user') || '{}');
+                const isOwner = campaign.DungeonMaster === user.id;
+
+                resultDiv.innerHTML = `
+                    <h3>Campaign Data:</h3>
+                    <p><span class="label">Campaign ID:</span><span class="value">${campaign.id}</span></p>
+                    <p><span class="label">Name:</span><span class="value">${campaign.name}</span></p>
+                    <p><span class="label">DungeonMaster ID:</span><span class="value">${campaign.DungeonMaster}</span></p>
+                    <h3>Ownership Check:</h3>
+                    <p><span class="label">Your User ID:</span><span class="value">${user.id || 'NOT LOGGED IN'}</span></p>
+                    <p><span class="label">Match:</span><span class="value" style="color: ${isOwner ? '#10b981' : '#ef4444'}">${isOwner ? '✅ YES - You own this campaign' : '❌ NO - You do NOT own this campaign'}</span></p>
+                    <h3>Raw JSON:</h3>
+                    <pre>${JSON.stringify(campaign, null, 2)}</pre>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `<p style="color: #ef4444;">❌ Network Error: ${error.message}</p>`;
+            }
+        }
+
+        // Auto-refresh on load
+        refreshData();
+    </script>
+</body>
+</html>
+

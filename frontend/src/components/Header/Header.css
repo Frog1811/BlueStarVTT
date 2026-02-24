@@ -1,0 +1,44 @@
+.header {
+  background-color: #1a252f;
+  padding: 1rem;
+  border-bottom: 2px solid #0d1117;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-shrink: 0;
+}
+
+.header-back-button {
+  background-color: #007bff;
+  color: #ffffff;
+  border: none;
+  padding: 0.5rem 1rem;
+  font-size: 1rem;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  white-space: nowrap;
+}
+
+.header-back-button:hover {
+  background-color: #0056b3;
+}
+
+.header-user-info {
+  color: #ffffff;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  margin-left: auto;
+}
+
+.header-user-info strong {
+  font-weight: 600;
+}
+
+.header-title {
+  margin: 0;
+  padding: 0;
+  color: #ffffff;
+  font-size: 1.5rem;
+}
+
