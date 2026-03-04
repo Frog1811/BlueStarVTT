@@ -1,12 +1,19 @@
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') });
+
 const mysql = require("mysql2/promise");
 
 const dbConfig = {
   host: process.env.MYSQL_HOST || "localhost",
   port: Number(process.env.MYSQL_PORT || 3306),
   user: process.env.MYSQL_USER || "root",
-  password: process.env.MYSQL_PASSWORD || "BlueStar6321",
+  password: process.env.MYSQL_PASSWORD,
   database: process.env.MYSQL_DATABASE || "DNDTool"
 };
+
+if (!dbConfig.password) {
+  console.warn('Warning: MYSQL_PASSWORD is not set. Create a backend/.env file or set MYSQL_PASSWORD in your environment.');
+}
 
 async function openDatabase() {
   return mysql.createPool({
