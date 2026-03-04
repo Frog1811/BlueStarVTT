@@ -145,61 +145,88 @@ async function populateBaseTokens() {
     console.log('[Database Migration] Populating base tokens...');
 
     // Icons folder
-    const iconsPath = path.join(__dirname, '../../frontend/src/assets/Icons');
-    const jocatPath = path.join(__dirname, '../../frontend/src/assets/JOCAT');
+    // Resolve frontend asset paths relative to the project root so this works
+    // whether the backend is run from the repo root, built into a container, or from a different cwd.
+    const projectRoot = path.resolve(__dirname, '..', '..');
+    const iconsPath = path.resolve(projectRoot, 'frontend', 'src', 'assets', 'Icons');
+    const jocatPath = path.resolve(projectRoot, 'frontend', 'src', 'assets', 'JOCAT');
+
+    // Check for existence and handle gracefully if missing (avoid ENOENT)
+    let iconsExist = true;
+    try {
+      await fs.access(iconsPath);
+    } catch (e) {
+      iconsExist = false;
+      console.warn('[Database Migration] Icons folder not found at', iconsPath);
+    }
+    let jocatExist = true;
+    try {
+      await fs.access(jocatPath);
+    } catch (e) {
+      jocatExist = false;
+      console.warn('[Database Migration] JOCAT folder not found at', jocatPath);
+    }
 
     let totalCreated = 0;
 
     // Process Icons folder
     try {
-      const iconFiles = await fs.readdir(iconsPath);
-      for (const file of iconFiles) {
-        if (/\.(png|jpg|jpeg|gif)$/i.test(file)) {
-          const tokenId = path.parse(file).name; // e.g., "Aberration"
-          const tokenName = path.parse(file).name;
-          const imagePath = `/assets/Icons/${file}`;
+      if (!iconsExist) {
+        console.log('[Database Migration] Skipping Icons processing because folder is missing');
+      } else {
+        const iconFiles = await fs.readdir(iconsPath);
+        for (const file of iconFiles) {
+          if (/\.(png|jpg|jpeg|gif)$/i.test(file)) {
+            const tokenId = path.parse(file).name; // e.g., "Aberration"
+            const tokenName = path.parse(file).name;
+            const imagePath = `/assets/Icons/${file}`;
 
-          // Check if exists
-          const exists = await get(db, "SELECT id FROM tokens WHERE id = ?", [tokenId]);
-          if (!exists) {
-            await run(
-              db,
-              "INSERT INTO tokens (id, campaign_id, token_folder_id, name, image_path, is_base_token) VALUES (?, NULL, NULL, ?, ?, 1)",
-              [tokenId, tokenName, imagePath]
-            );
-            totalCreated++;
+            // Check if exists
+            const exists = await get(db, "SELECT id FROM tokens WHERE id = ?", [tokenId]);
+            if (!exists) {
+              await run(
+                db,
+                "INSERT INTO tokens (id, campaign_id, token_folder_id, name, image_path, is_base_token) VALUES (?, NULL, NULL, ?, ?, 1)",
+                [tokenId, tokenName, imagePath]
+              );
+              totalCreated++;
+            }
           }
         }
+        console.log(`[Database Migration] Created ${totalCreated} Icon base tokens`);
       }
-      console.log(`[Database Migration] Created ${totalCreated} Icon base tokens`);
     } catch (error) {
       console.error('[Database Migration] Failed to process Icons:', error.message);
     }
 
     // Process JOCAT folder
     try {
-      const jocatFiles = await fs.readdir(jocatPath);
-      let jocatCreated = 0;
-      for (const file of jocatFiles) {
-        if (/\.(png|jpg|jpeg|gif)$/i.test(file)) {
-          const tokenId = `jocat-${file}`; // e.g., "jocat-Aracockra.png"
-          const tokenName = path.parse(file).name.replace(/[-_]+/g, ' ').trim();
-          const imagePath = `/assets/JOCAT/${file}`;
+      if (!jocatExist) {
+        console.log('[Database Migration] Skipping JOCAT processing because folder is missing');
+      } else {
+        const jocatFiles = await fs.readdir(jocatPath);
+        let jocatCreated = 0;
+        for (const file of jocatFiles) {
+          if (/\.(png|jpg|jpeg|gif)$/i.test(file)) {
+            const tokenId = `jocat-${file}`; // e.g., "jocat-Aracockra.png"
+            const tokenName = path.parse(file).name.replace(/[-_]+/g, ' ').trim();
+            const imagePath = `/assets/JOCAT/${file}`;
 
-          // Check if exists
-          const exists = await get(db, "SELECT id FROM tokens WHERE id = ?", [tokenId]);
-          if (!exists) {
-            await run(
-              db,
-              "INSERT INTO tokens (id, campaign_id, token_folder_id, name, image_path, is_base_token) VALUES (?, NULL, NULL, ?, ?, 1)",
-              [tokenId, tokenName, imagePath]
-            );
-            jocatCreated++;
-            totalCreated++;
+            // Check if exists
+            const exists = await get(db, "SELECT id FROM tokens WHERE id = ?", [tokenId]);
+            if (!exists) {
+              await run(
+                db,
+                "INSERT INTO tokens (id, campaign_id, token_folder_id, name, image_path, is_base_token) VALUES (?, NULL, NULL, ?, ?, 1)",
+                [tokenId, tokenName, imagePath]
+              );
+              jocatCreated++;
+              totalCreated++;
+            }
           }
         }
+        console.log(`[Database Migration] Created ${jocatCreated} JOCAT base tokens`);
       }
-      console.log(`[Database Migration] Created ${jocatCreated} JOCAT base tokens`);
     } catch (error) {
       console.error('[Database Migration] Failed to process JOCAT:', error.message);
     }
@@ -1341,7 +1368,18 @@ app.get("/api/campaigns/:campaignId/tokens", async (req, res) => {
 
 app.get("/api/base-tokens", async (req, res) => {
   try {
-    const iconsPath = path.join(__dirname, '../../frontend/src/assets/Icons');
+    // Resolve frontend assets relative to project root (robust to different cwd/runtime locations)
+    const projectRoot = path.resolve(__dirname, '..', '..');
+    const iconsPath = path.resolve(projectRoot, 'frontend', 'src', 'assets', 'Icons');
+
+    // If folder doesn't exist, return empty list instead of throwing ENOENT
+    try {
+      await fs.access(iconsPath);
+    } catch (e) {
+      console.warn('[Base Tokens] Icons folder not found at', iconsPath, '- returning empty list');
+      return res.json([]);
+    }
+
     const files = await fs.readdir(iconsPath);
 
     const baseTokens = files
