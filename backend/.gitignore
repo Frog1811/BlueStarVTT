@@ -7,3 +7,7 @@ node_modules/
 # Logs
 npm-debug.log*
 
+# maps & Tokens
+maps/
+tokens/
+
