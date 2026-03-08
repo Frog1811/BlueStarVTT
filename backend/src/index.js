@@ -23,12 +23,48 @@ app.use(express.json());
 
 let db;
 
+// Resolve project root and provide cross-environment paths for maps and tokens.
+// In Docker set MAPS_PATH=/app/maps and TOKENS_PATH=/app/tokens (and mount host /maps to /app/maps)
+const projectRoot = path.resolve(__dirname, '..', '..');
+const MAPS_PATH = process.env.MAPS_PATH || path.resolve(projectRoot, 'maps');
+const TOKENS_PATH = process.env.TOKENS_PATH || path.resolve(projectRoot, 'tokens');
+
+// Helper to resolve stored token image_path values (like 'tokens/{campaignId}/{folder}/{filename}')
+function resolveTokenPhysicalPath(imagePath) {
+  if (!imagePath) return null;
+  // Leave base asset paths to be handled by frontend (/assets/...)
+  if (imagePath.startsWith('/assets/')) return null;
+
+  // Normalize leading slash
+  let p = imagePath.startsWith('/') ? imagePath.slice(1) : imagePath;
+
+  // If path starts with 'tokens/', resolve under TOKENS_PATH
+  if (p.startsWith('tokens/')) {
+    return path.join(TOKENS_PATH, p.slice('tokens/'.length));
+  }
+
+  // If it already refers to maps/ or other paths, resolve relative to project root
+  return path.join(projectRoot, p);
+}
+
+// Ensure maps & tokens directories exist on startup (non-blocking)
+(async () => {
+  try {
+    await fs.mkdir(MAPS_PATH, { recursive: true });
+    await fs.mkdir(TOKENS_PATH, { recursive: true });
+    console.log('[Startup] Ensured MAPS_PATH:', MAPS_PATH, 'TOKENS_PATH:', TOKENS_PATH);
+  } catch (err) {
+    console.error('[Startup] Failed to create maps/tokens directories:', err);
+  }
+})();
+
 // Configure multer for file uploads - simplified to not use db in storage config
 const storage = multer.diskStorage({
   destination: async (req, file, cb) => {
     try {
       const campaignId = req.body.campaignId || req.params.campaignId;
-      let uploadPath = path.join(__dirname, '../../maps', campaignId);
+      // Use MAPS_PATH so the location is consistent between local and Docker
+      let uploadPath = path.join(MAPS_PATH, campaignId);
 
       await fs.mkdir(uploadPath, { recursive: true });
       cb(null, uploadPath);
@@ -87,7 +123,8 @@ const tokenStorage = multer.diskStorage({
       const folderName = req.query.tokenFolderName || 'root';
 
       console.log('[Multer Destination] campaignId:', campaignId, 'folderName:', folderName);
-      let uploadPath = path.join(__dirname, '../../tokens', campaignId, folderName);
+      // Use TOKENS_PATH so the location is consistent between local and Docker
+      let uploadPath = path.join(TOKENS_PATH, campaignId, folderName);
 
       await fs.mkdir(uploadPath, { recursive: true });
       console.log('[Multer Destination] Created uploadPath:', uploadPath);
@@ -118,11 +155,10 @@ const uploadToken = multer({
   }
 });
 
-// Serve static map files
-app.use('/maps', express.static(path.join(__dirname, '../../maps')));
-
+// Serve static map files and token files from cross-environment paths
+app.use('/maps', express.static(MAPS_PATH));
 // Serve static token files
-app.use('/tokens', express.static(path.join(__dirname, '../../tokens')));
+app.use('/tokens', express.static(TOKENS_PATH));
 
 const PRESENCE_TIMEOUT_MS = 30000;
 const PRESENCE_SWEEP_MS = 10000;
@@ -679,7 +715,7 @@ app.post("/api/campaigns/:campaignId/folders", async (req, res) => {
 
     // Create physical folder
     const folderPath = await buildFolderPath(id);
-    const physicalPath = path.join(__dirname, '../../maps', campaignId, folderPath);
+    const physicalPath = path.join(MAPS_PATH, campaignId, folderPath);
     await fs.mkdir(physicalPath, { recursive: true });
 
     return res.status(201).json({ id, campaign_id: campaignId, name, parent_folder_id: parentFolderId || null, color: color || '#3b82f6' });
@@ -723,13 +759,13 @@ app.patch("/api/folders/:folderId", async (req, res) => {
 
       // Rename physical folder
       const oldPath = await buildFolderPath(folderId);
-      const oldPhysicalPath = path.join(__dirname, '../../maps', folder.campaign_id, oldPath);
+      const oldPhysicalPath = path.join(MAPS_PATH, folder.campaign_id, oldPath);
 
       // Update in database first
       await run(db, `UPDATE map_folders SET name = ? WHERE id = ?`, [name, folderId]);
 
       const newPath = await buildFolderPath(folderId);
-      const newPhysicalPath = path.join(__dirname, '../../maps', folder.campaign_id, newPath);
+      const newPhysicalPath = path.join(MAPS_PATH, folder.campaign_id, newPath);
 
       try {
         await fs.rename(oldPhysicalPath, newPhysicalPath);
@@ -782,7 +818,7 @@ app.delete("/api/folders/:folderId", async (req, res) => {
 
     // Delete physical files for all maps
     for (const map of allMaps) {
-      const physicalPath = path.join(__dirname, '../../maps', map.filepath);
+      const physicalPath = path.join(MAPS_PATH, map.filepath);
       try {
         await fs.unlink(physicalPath);
         console.log('[Delete Folder] Deleted map file:', map.name);
@@ -799,7 +835,7 @@ app.delete("/api/folders/:folderId", async (req, res) => {
 
     // Delete physical folder and all its contents
     const folderPath = await buildFolderPath(folderId);
-    const physicalPath = path.join(__dirname, '../../maps', folder.campaign_id, folderPath);
+    const physicalPath = path.join(MAPS_PATH, folder.campaign_id, folderPath);
 
     try {
       await fs.rm(physicalPath, { recursive: true, force: true });
@@ -852,10 +888,7 @@ app.post("/api/campaigns/:campaignId/maps", upload.single('map'), async (req, re
     }
 
     const id = uuidv4();
-    const relativePath = path.relative(
-      path.join(__dirname, '../../maps'),
-      req.file.path
-    ).replace(/\\/g, '/');
+    const relativePath = path.relative(MAPS_PATH, req.file.path).replace(/\\/g, '/');
 
     console.log('[Upload] Saving to database with ID:', id);
     console.log('[Upload] Relative path:', relativePath);
@@ -918,7 +951,7 @@ app.delete("/api/maps/:mapId", async (req, res) => {
     console.log('[Delete] Deleting map:', map.name, 'ID:', mapId);
 
     // Delete physical file
-    const physicalPath = path.join(__dirname, '../../maps', map.filepath);
+    const physicalPath = path.join(MAPS_PATH, map.filepath);
     console.log('[Delete] Physical path:', physicalPath);
 
     try {
@@ -995,7 +1028,7 @@ app.patch("/api/maps/:mapId", async (req, res) => {
       values.push(folder_id);
 
       // Handle physical file movement
-      const oldFilePath = path.join(__dirname, '../../maps', map.filepath);
+      const oldFilePath = path.join(MAPS_PATH, map.filepath);
 
       try {
         // Build new file path
@@ -1003,18 +1036,18 @@ app.patch("/api/maps/:mapId", async (req, res) => {
         if (folder_id) {
           const newFolderPath = await buildFolderPath(folder_id);
           newRelativePath = path.relative(
-            path.join(__dirname, '../../maps'),
-            path.join(__dirname, '../../maps', map.campaign_id, newFolderPath, path.basename(map.filepath))
+            MAPS_PATH,
+            path.join(MAPS_PATH, map.campaign_id, newFolderPath, path.basename(map.filepath))
           ).replace(/\\/g, '/');
         } else {
           // Moving to root
           newRelativePath = path.relative(
-            path.join(__dirname, '../../maps'),
-            path.join(__dirname, '../../maps', map.campaign_id, path.basename(map.filepath))
+            MAPS_PATH,
+            path.join(MAPS_PATH, map.campaign_id, path.basename(map.filepath))
           ).replace(/\\/g, '/');
         }
 
-        const newFilePath = path.join(__dirname, '../../maps', newRelativePath);
+        const newFilePath = path.join(MAPS_PATH, newRelativePath);
         console.log(`[Map Move] Old path: ${oldFilePath}`);
         console.log(`[Map Move] New path: ${newFilePath}`);
 
@@ -1093,7 +1126,7 @@ app.post("/api/campaigns/:campaignId/token-folders", async (req, res) => {
 
     // Create physical folder using the full hierarchy path
     const folderPath = await buildTokenFolderPath(id);
-    const physicalPath = path.join(__dirname, '../../tokens', campaignId, folderPath);
+    const physicalPath = path.join(TOKENS_PATH, campaignId, folderPath);
     try {
       await fs.mkdir(physicalPath, { recursive: true });
       console.log('[Create Token Folder] Physical folder created:', physicalPath);
@@ -1151,8 +1184,8 @@ app.patch("/api/token-folders/:folderId", async (req, res) => {
         console.log('[Token Folder Update] Renaming folder from', oldName, 'to', newName);
 
         // Check if physical folder exists and rename it
-        const oldPhysicalPath = path.join(__dirname, '../../tokens', folder.campaign_id, oldName);
-        const newPhysicalPath = path.join(__dirname, '../../tokens', folder.campaign_id, newName);
+        const oldPhysicalPath = path.join(TOKENS_PATH, folder.campaign_id, oldName);
+        const newPhysicalPath = path.join(TOKENS_PATH, folder.campaign_id, newName);
 
         try {
           // Check if old folder exists
@@ -1223,7 +1256,7 @@ app.delete("/api/token-folders/:folderId", async (req, res) => {
 
     // Delete physical files for all tokens
     for (const token of allTokens) {
-      const physicalPath = path.join(__dirname, '../../tokens', token.image_path);
+      const physicalPath = resolveTokenPhysicalPath(token.image_path) || path.join(TOKENS_PATH, token.image_path);
       try {
         await fs.unlink(physicalPath);
         console.log('[Delete Token Folder] Deleted token file:', token.name);
@@ -1237,7 +1270,7 @@ app.delete("/api/token-folders/:folderId", async (req, res) => {
     console.log('[Delete Token Folder] Folder deleted from database');
 
     // Delete physical folder
-    const physicalFolderPath = path.join(__dirname, '../../tokens', folder.campaign_id, folder.name);
+    const physicalFolderPath = path.join(TOKENS_PATH, folder.campaign_id, folder.name);
     try {
       // Check if folder exists before trying to delete
       await fs.access(physicalFolderPath);
@@ -1460,7 +1493,7 @@ app.patch("/api/tokens/:tokenId", conditionalUploadToken, async (req, res) => {
 
       // Delete old file - but only if it's not a Base token path
       if (!token.image_path.startsWith('/assets/')) {
-        const oldPath = path.join(__dirname, '../../', token.image_path);
+        const oldPath = resolveTokenPhysicalPath(token.image_path) || path.join(projectRoot, token.image_path);
         try {
           await fs.unlink(oldPath);
           console.log('[Token Update] Deleted old token file:', token.name);
@@ -1482,7 +1515,7 @@ app.patch("/api/tokens/:tokenId", conditionalUploadToken, async (req, res) => {
         // The file should already be saved to the correct folder by multer (via query param)
         // But if tokenFolderName wasn't passed, it goes to _temp and needs to be moved
         const currentPath = req.file.path;
-        const correctPath = path.join(__dirname, '../../tokens', token.campaign_id, folderName);
+        const correctPath = path.join(TOKENS_PATH, token.campaign_id, folderName);
         const correctFilePath = path.join(correctPath, req.file.filename);
 
         console.log('[Token Update] Current file path:', currentPath);
@@ -1525,7 +1558,7 @@ app.patch("/api/tokens/:tokenId", conditionalUploadToken, async (req, res) => {
       console.log('[Token Update] Switching to Base token:', imagePath);
       // Delete old file if it was a custom file
       if (!token.image_path.startsWith('/assets/')) {
-        const oldPath = path.join(__dirname, '../../', token.image_path);
+        const oldPath = resolveTokenPhysicalPath(token.image_path) || path.join(projectRoot, token.image_path);
         try {
           await fs.unlink(oldPath);
           console.log('[Token Update] Deleted old token file when switching to Base:', token.name);
@@ -1581,7 +1614,7 @@ app.patch("/api/tokens/:tokenId/move", async (req, res) => {
         const filename = path.basename(token.image_path);
 
         // Build old and new paths
-        const oldPath = path.join(__dirname, '../../', token.image_path);
+        const oldPath = resolveTokenPhysicalPath(token.image_path) || path.join(projectRoot, token.image_path);
 
         // Get the folder name for the destination
         let newFolderName = 'root';
@@ -1593,7 +1626,7 @@ app.patch("/api/tokens/:tokenId/move", async (req, res) => {
         }
 
         const newImagePath = `tokens/${token.campaign_id}/${newFolderName}/${filename}`;
-        const newPath = path.join(__dirname, '../../', newImagePath);
+        const newPath = resolveTokenPhysicalPath(newImagePath) || path.join(projectRoot, newImagePath);
 
         // Ensure destination folder exists
         await fs.mkdir(path.dirname(newPath), { recursive: true });
@@ -1651,7 +1684,7 @@ app.delete("/api/tokens/:tokenId", async (req, res) => {
     }
 
     // Delete physical file
-    const physicalPath = path.join(__dirname, '../../', token.image_path);
+    const physicalPath = resolveTokenPhysicalPath(token.image_path) || path.join(projectRoot, token.image_path);
     try {
       await fs.unlink(physicalPath);
       console.log('[Delete Token] Deleted token file:', token.name);
@@ -1686,7 +1719,7 @@ app.delete("/api/tokens/:tokenId/force", async (req, res) => {
     }
 
     // Delete physical file
-    const physicalPath = path.join(__dirname, '../../', token.image_path);
+    const physicalPath = resolveTokenPhysicalPath(token.image_path) || path.join(projectRoot, token.image_path);
     try {
       await fs.unlink(physicalPath);
       console.log('[Force Delete Token] Deleted token file:', token.name);
