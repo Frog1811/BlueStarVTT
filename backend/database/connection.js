@@ -31,6 +31,24 @@ async function get(db, sql, params = []) {
   return rows[0];
 }
 
+// Helper: check if a table exists in the current database
+async function hasTable(db, tableName) {
+  const [rows] = await db.execute(
+    `SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?`,
+    [tableName]
+  );
+  return rows.length > 0;
+}
+
+// Helper: check if a column exists on a table in the current database
+async function hasColumn(db, tableName, columnName) {
+  const [rows] = await db.execute(
+    `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+    [tableName, columnName]
+  );
+  return rows.length > 0;
+}
+
 async function ensureSchema(db) {
   await run(
     db,
@@ -38,12 +56,22 @@ async function ensureSchema(db) {
   );
 
   // Ensure users table has role column
-  await run(
-    db,
-    "ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) NOT NULL DEFAULT 'user';"
-  ).catch(err => {
+  try {
+    const usersTableExists = await hasTable(db, 'users');
+    if (usersTableExists) {
+      const hasRole = await hasColumn(db, 'users', 'role');
+      if (!hasRole) {
+        await run(db, "ALTER TABLE users ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'user';");
+        console.log('Users alter result: added role column');
+      } else {
+        console.log('Users alter result: role column already exists');
+      }
+    } else {
+      console.log('Users alter result: users table does not exist yet');
+    }
+  } catch (err) {
     console.log('Users alter result:', err.message);
-  });
+  }
 
   await run(
     db,
@@ -115,7 +143,7 @@ async function ensureSchema(db) {
     db,
     `CREATE TABLE IF NOT EXISTS tokens (
       id VARCHAR(36) PRIMARY KEY,
-      campaign_id VARCHAR(36) NOT NULL,
+      campaign_id VARCHAR(36) DEFAULT NULL,
       token_folder_id VARCHAR(36) DEFAULT NULL,
       name VARCHAR(255) NOT NULL,
       image_path VARCHAR(512) NOT NULL,
@@ -127,16 +155,33 @@ async function ensureSchema(db) {
   );
 
   // Ensure map_tokens table has visibility and transparency columns
-  // This will only add columns if they don't already exist
-  await run(
-    db,
-    `ALTER TABLE map_tokens 
-     ADD COLUMN IF NOT EXISTS is_visible_to_players BOOLEAN DEFAULT TRUE,
-     ADD COLUMN IF NOT EXISTS transparency FLOAT DEFAULT 1.0;`
-  ).catch(err => {
-    // Table might not exist yet (will be created by migrations), so ignore errors
+  // Check table and columns via INFORMATION_SCHEMA to be compatible with older MySQL versions
+  try {
+    const mapTokensExists = await hasTable(db, 'map_tokens');
+    if (!mapTokensExists) {
+      console.log('Map tokens alter result: map_tokens table does not exist yet');
+    } else {
+      // is_visible_to_players
+      const hasVisibility = await hasColumn(db, 'map_tokens', 'is_visible_to_players');
+      if (!hasVisibility) {
+        await run(db, "ALTER TABLE map_tokens ADD COLUMN is_visible_to_players BOOLEAN DEFAULT TRUE;");
+        console.log('Map tokens alter result: added is_visible_to_players');
+      } else {
+        console.log('Map tokens alter result: is_visible_to_players already exists');
+      }
+
+      // transparency
+      const hasTransparency = await hasColumn(db, 'map_tokens', 'transparency');
+      if (!hasTransparency) {
+        await run(db, "ALTER TABLE map_tokens ADD COLUMN transparency FLOAT DEFAULT 1.0;");
+        console.log('Map tokens alter result: added transparency');
+      } else {
+        console.log('Map tokens alter result: transparency already exists');
+      }
+    }
+  } catch (err) {
     console.log('Map tokens alter result:', err.message);
-  });
+  }
 
   // Create initiative_tracker table
   await run(

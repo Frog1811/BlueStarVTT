@@ -6,6 +6,7 @@ const { v4: uuidv4 } = require("uuid");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs").promises;
+const fsSync = require("fs");
 const sizeOf = require("image-size");
 const {
   dbConfig,
@@ -24,10 +25,54 @@ app.use(express.json());
 let db;
 
 // Resolve project root and provide cross-environment paths for maps and tokens.
-// In Docker set MAPS_PATH=/app/maps and TOKENS_PATH=/app/tokens (and mount host /maps to /app/maps)
-const projectRoot = path.resolve(__dirname, '..', '..');
-const MAPS_PATH = process.env.MAPS_PATH || path.resolve(projectRoot, 'maps');
-const TOKENS_PATH = process.env.TOKENS_PATH || path.resolve(projectRoot, 'tokens');
+// We need to support two layouts:
+// - Local dev: <project-root>/backend/src -> maps is at <project-root>/maps (two levels up)
+// - Docker: /app/src -> maps is at /app/maps (one level up)
+function resolveProjectRoot() {
+  // Allow explicit override
+  if (process.env.PROJECT_ROOT) {
+    const provided = process.env.PROJECT_ROOT;
+    return path.isAbsolute(provided) ? provided : path.resolve(__dirname, provided);
+  }
+
+  // Candidate: two levels up (works for repo layout where this file is backend/src/index.js)
+  const candidateA = path.resolve(__dirname, '..', '..');
+  const candidateAMaps = path.join(candidateA, 'maps');
+
+  // Candidate: one level up (works for Docker where code is at /app/src)
+  const candidateB = path.resolve(__dirname, '..');
+  const candidateBMaps = path.join(candidateB, 'maps');
+
+  // Prefer candidate that contains expected folders (maps)
+  try {
+    if (fsSync.existsSync(candidateAMaps)) return candidateA;
+  } catch (e) {
+    // ignore
+  }
+
+  try {
+    if (fsSync.existsSync(candidateBMaps)) return candidateB;
+  } catch (e) {
+    // ignore
+  }
+
+  // Fallback: prefer candidateA (original behavior)
+  return candidateA;
+}
+
+const projectRoot = resolveProjectRoot();
+
+// Resolve MAPS_PATH/TOKENS_PATH: accept absolute env paths, or resolve relative to projectRoot
+function resolveEnvPath(envVar, defaultPath) {
+  if (process.env[envVar]) {
+    const p = process.env[envVar];
+    return path.isAbsolute(p) ? p : path.resolve(projectRoot, p);
+  }
+  return defaultPath;
+}
+
+const MAPS_PATH = resolveEnvPath('MAPS_PATH', path.resolve(projectRoot, 'maps'));
+const TOKENS_PATH = resolveEnvPath('TOKENS_PATH', path.resolve(projectRoot, 'tokens'));
 
 // Helper to resolve stored token image_path values (like 'tokens/{campaignId}/{folder}/{filename}')
 function resolveTokenPhysicalPath(imagePath) {
@@ -52,6 +97,7 @@ function resolveTokenPhysicalPath(imagePath) {
   try {
     await fs.mkdir(MAPS_PATH, { recursive: true });
     await fs.mkdir(TOKENS_PATH, { recursive: true });
+    console.log('[Startup] projectRoot:', projectRoot);
     console.log('[Startup] Ensured MAPS_PATH:', MAPS_PATH, 'TOKENS_PATH:', TOKENS_PATH);
   } catch (err) {
     console.error('[Startup] Failed to create maps/tokens directories:', err);
@@ -180,10 +226,9 @@ async function populateBaseTokens() {
   try {
     console.log('[Database Migration] Populating base tokens...');
 
-    // Icons folder
     // Resolve frontend asset paths relative to the project root so this works
     // whether the backend is run from the repo root, built into a container, or from a different cwd.
-    const projectRoot = path.resolve(__dirname, '..', '..');
+    // Use the same projectRoot computed above (do not shadow it)
     const iconsPath = path.resolve(projectRoot, 'frontend', 'src', 'assets', 'Icons');
     const jocatPath = path.resolve(projectRoot, 'frontend', 'src', 'assets', 'JOCAT');
 
@@ -1402,7 +1447,7 @@ app.get("/api/campaigns/:campaignId/tokens", async (req, res) => {
 app.get("/api/base-tokens", async (req, res) => {
   try {
     // Resolve frontend assets relative to project root (robust to different cwd/runtime locations)
-    const projectRoot = path.resolve(__dirname, '..', '..');
+    // Use the top-level projectRoot computed at startup
     const iconsPath = path.resolve(projectRoot, 'frontend', 'src', 'assets', 'Icons');
 
     // If folder doesn't exist, return empty list instead of throwing ENOENT
