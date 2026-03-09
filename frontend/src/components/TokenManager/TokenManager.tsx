@@ -587,60 +587,6 @@ function TokenManager({
     );
   };
 
-  // Render base tokens folder
-  const renderBaseFolder = () => {
-    const isExpanded = expandedFolders.has('BASE');
-
-    return (
-      <div className="base-folder-section">
-        <div
-          className="token-folder-header base-folder-header"
-          onContextMenu={(e) => e.preventDefault()}
-          onClick={() => toggleFolder('BASE')}
-        >
-          <button
-            className="folder-toggle"
-            onClick={(e) => {
-              e.stopPropagation();
-              toggleFolder('BASE');
-            }}
-          >
-            {isExpanded ? '▼' : '▶'}
-          </button>
-          <span className="folder-icon">📦</span>
-          <span className="folder-name base-folder-name">Base</span>
-          <span className="read-only-badge">READ-ONLY</span>
-        </div>
-
-        {isExpanded && (
-          <div className="folder-contents base-folder-contents">
-            {baseTokens.map(token => (
-              <div
-                key={token.id}
-                className="token-item base-token-item"
-                draggable
-                onDragStart={(e) => handleTokenDragStart(e, token.id)}
-                onDragEnd={handleTokenDragEnd}
-                style={{ opacity: draggedToken === token.id ? 0.5 : 1 }}
-              >
-                <img
-                  src={getBaseTokenImageUrl(token.imagePath)}
-                  alt={token.name}
-                  className="token-thumbnail"
-                  draggable={false}
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><rect fill="%23666" width="48" height="48"/><text x="24" y="24" text-anchor="middle" dominant-baseline="central" fill="%23fff" font-size="10">icon</text></svg>';
-                  }}
-                />
-                <span className="token-name base-token-name" title={token.name}>{token.name}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  };
-
   // Render JOCAT tokens folder (top-level, read-only)
   const renderJocatFolder = () => {
     const isExpanded = expandedFolders.has('JOCAT_TOKENS');
@@ -713,7 +659,6 @@ function TokenManager({
           }
         }}
       >
-        {renderBaseFolder()}
         {renderJocatFolder()}
 
         <div
