@@ -741,7 +741,59 @@ function DMView({ sortedUsers, connected, tokenUpdate }: DMViewProps) {
           const gridY = Math.floor(mapPixelY / cellHeight);
 
           // Add token to map
-          await addTokenToMap(activeMap.id, token.id, gridX, gridY, 1);
+          // Try adding token; if the server reports 'token not found' (common after moving base assets),
+          // attempt fallback candidate ids derived from the image filename.
+          const tryAddWithCandidate = async (candidateId: string) => {
+            try {
+              await addTokenToMap(activeMap.id, candidateId, gridX, gridY, 1);
+              return true;
+            } catch (err: any) {
+              if (err instanceof Error && err.message && err.message.toLowerCase().includes('token not found')) {
+                return false;
+              }
+              throw err;
+            }
+          };
+
+          let added = false;
+          if (token.id) {
+            try {
+              await addTokenToMap(activeMap.id, token.id, gridX, gridY, 1);
+              added = true;
+            } catch (err: any) {
+              if (!(err instanceof Error) || !err.message.toLowerCase().includes('token not found')) {
+                throw err;
+              }
+            }
+          }
+
+          if (!added) {
+            const imagePath: string | undefined = token.image_path || token.imagePath || '';
+            const fileName = (imagePath || '').split('/').pop() || '';
+            const nameNoExt = fileName.replace(/\.[^/.]+$/, '') || '';
+
+            const candidates: string[] = [];
+            if (nameNoExt) candidates.push(nameNoExt);
+            if (fileName) candidates.push(`jocat-${fileName}`);
+            if (nameNoExt) candidates.push(`jocat-${nameNoExt}`);
+
+            if (token.id && !candidates.includes(token.id)) {
+              candidates.unshift(token.id);
+            }
+
+            for (const cand of candidates) {
+              if (!cand) continue;
+              const ok = await tryAddWithCandidate(cand);
+              if (ok) {
+                added = true;
+                break;
+              }
+            }
+          }
+
+          if (!added) {
+            throw new Error('token not found');
+          }
           setTokenRefreshKey(prev => prev + 1);  // Force MapTokenLayer to reload tokens
         }
       } catch (err) {
@@ -1154,6 +1206,8 @@ function DMView({ sortedUsers, connected, tokenUpdate }: DMViewProps) {
 }
 
 export default DMView;
+
+
 
 
 

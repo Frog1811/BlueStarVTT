@@ -193,8 +193,67 @@ function MapTokenLayer({ map, campaignId, isDM, zoom = 1, panX = 0, panY = 0, on
       const gridX = Math.floor(mouseMapPos.x / cellWidthExact);
       const gridY = Math.floor(mouseMapPos.y / cellHeightExact);
 
-      // Add token to map - works the same for all tokens now (base tokens are pre-populated in DB)
-      await addTokenToMap(map.id, token.id, gridX, gridY, 1);
+      // Try adding token to map. If token.id doesn't exist in DB (common when images were moved between base folders),
+      // attempt a set of fallback candidate ids derived from the image filename.
+      const tryAddWithCandidate = async (candidateId: string) => {
+        try {
+          await addTokenToMap(map.id, candidateId, gridX, gridY, 1);
+          return true;
+        } catch (err: any) {
+          // Only swallow 'token not found' so other errors still surface
+          if (err instanceof Error && err.message && err.message.toLowerCase().includes('token not found')) {
+            return false;
+          }
+          throw err;
+        }
+      };
+
+      // First attempt: use token.id if present
+      let added = false;
+      if (token.id) {
+        try {
+          await addTokenToMap(map.id, token.id, gridX, gridY, 1);
+          added = true;
+        } catch (err: any) {
+          // If token not found, we'll try fallbacks below
+          if (!(err instanceof Error) || !err.message.toLowerCase().includes('token not found')) {
+            throw err;
+          }
+        }
+      }
+
+      if (!added) {
+        // Build fallback candidates using the token's image path (image_path or imagePath)
+        const imagePath: string | undefined = token.image_path || token.imagePath || '';
+        const fileName = (imagePath || '').split('/').pop() || '';
+        const nameNoExt = fileName.replace(/\.[^/.]+$/, '') || '';
+
+        const candidates: string[] = [];
+        // include name without extension (Icons base tokens used this id)
+        if (nameNoExt) candidates.push(nameNoExt);
+        // include jocat- + filename (backend uses this for JOCAT tokens)
+        if (fileName) candidates.push(`jocat-${fileName}`);
+        // include jocat- + name without ext (defensive)
+        if (nameNoExt) candidates.push(`jocat-${nameNoExt}`);
+
+        // ensure we don't retry the original id twice
+        if (token.id && !candidates.includes(token.id)) {
+          candidates.unshift(token.id);
+        }
+
+        for (const cand of candidates) {
+          if (!cand) continue;
+          const ok = await tryAddWithCandidate(cand);
+          if (ok) {
+            added = true;
+            break;
+          }
+        }
+      }
+
+      if (!added) {
+        throw new Error('token not found');
+      }
 
       await loadMapTokens();
       onTokensChange?.();
@@ -974,8 +1033,6 @@ function MapTokenLayer({ map, campaignId, isDM, zoom = 1, panX = 0, panY = 0, on
 }
 
 export default MapTokenLayer;
-
-
 
 
 
