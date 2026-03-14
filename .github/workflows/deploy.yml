@@ -17,4 +17,5 @@ jobs:
           username: deploy-blue-star-vtt
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
+            cd /var/www/BlueStarVTT
             ./deploy.sh
