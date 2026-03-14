@@ -25,8 +25,6 @@ function Home() {
     }
   })
 
-  console.log("TEST")
-
   const isAuthed = Boolean(user)
 
   useEffect(() => {
